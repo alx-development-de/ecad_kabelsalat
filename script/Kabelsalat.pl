@@ -11,9 +11,6 @@ use Log::Log4perl::Logger;
 
 use ALX::EN81346;
 
-use Spreadsheet::Read qw(ReadData);
-use Spreadsheet::WriteExcel;
-
 use Getopt::Long;
 
 use Data::Dumper; # TODO: Remove debug stuff
