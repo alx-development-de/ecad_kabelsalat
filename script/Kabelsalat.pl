@@ -21,8 +21,8 @@ use Data::Dumper; # TODO: Remove debug stuff
 # Processing the command line options
 GetOptions(
     'loglevel=s' => \(my $log_level = 'INFO'),
-    'wiring=s'      => \(my $opt_wiring_reference = 'C:/Users/Z3M9GD/workspace/customers/beenen/resource/wiring-export.txt'), # Exported wiring list
-    'devices=s'      => \(my $opt_device_reference = 'C:/Users/Z3M9GD/workspace/customers/beenen/resource/devices-export.txt'), # Exported device list
+    'wiring=s'      => \(my $opt_wiring_reference = './data/wiring-export.txt'), # Exported wiring list
+    'devices=s'      => \(my $opt_device_reference = './data/devices-export.txt'), # Exported device list
     'output=s'      => \(my $opt_output_reference = undef), # If defined, the output is redirected into this file
 ) or die "Invalid options passed to $0\n";
 
