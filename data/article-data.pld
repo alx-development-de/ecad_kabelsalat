@@ -1,0 +1,20 @@
+$VAR1 = {
+          'SIE.LZX:PT570024' => {
+                               'CONTACTS' => {
+                                               'A1' => 'HUELSE',
+                                               'A2' => 'HUELSE',
+                                               '11' => 'OHNE',
+                                               '14' => 'OHNE'
+                                             }
+                             },
+          'SIE.3RW4026-1TB04' => {
+                               'CONTACTS' => {
+                                               'A1' => 'HUELSE',
+                                               'A2' => 'HUELSE',
+                                               '1L1' => 'OHNE',
+                                               '2T1' => 'OHNE',
+                                               '3L2' => 'OHNE',
+                                               '4T2' => 'OHNE'
+                                             }
+                             }
+        };
