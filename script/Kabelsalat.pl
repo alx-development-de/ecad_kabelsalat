@@ -10,6 +10,9 @@ use Log::Log4perl;
 use Log::Log4perl::Level;
 use Log::Log4perl::Logger;
 
+use Encode qw(decode encode);
+use Excel::Writer::XLSX;
+
 use ALX::EN81346;
 
 use Getopt::Long;
@@ -158,7 +161,7 @@ $logger->debug("Analyzing device list content");
 my %device_structure = ();
 my @device_file_content = File::Slurp::read_file($options{'files'}{'devices'}, { 'chomp' => 1 });
 foreach my $line (@device_file_content) {
-    #chomp($line);
+    # Splitting the content of the csv data
     my ($device, $article_name, $master) = split(/[;]/, $line);
 
     # Checking device identifier against the EN81346 specification
@@ -189,10 +192,124 @@ $logger->info(scalar(keys(%bom)), " Different article(s) found in the structure"
 # print join(', ', keys(%bom)) . "\n"; # Printing all articles identified
 
 # Parsing the wiring information list
+my @connections = ();
+$logger->info("Parsing the wiring file content from [$options{'files'}{'wiring'}]");
 my @wiring_file_content = File::Slurp::read_file($options{'files'}{'wiring'}, { 'chomp' => 1 });
 foreach my $line (@wiring_file_content) {
-    #next unless $line; # skip empty ines
+    # Splitting the content of the csv data
+    my @line_content = split(/[;]/, $line);
+    # TODO: Implement configurable defaults
+    my %connection = (
+        'source'          => ALX::EN81346::to_string($line_content[0]),
+        'target'          => ALX::EN81346::to_string($line_content[1]),
+        'color'           => $line_content[3] ? $line_content[3] : 'BU',
+        'gauge'           => $line_content[4] ? $line_content[4] : '1mm',
+        'length'          => $line_content[5] ? $line_content[5] : '0,666mm',
+        'comment'         => $line_content[6],
+    );
+
+    $logger->debug("Inspection connection [$connection{'source'} <-> $connection{'target'}]");
+    unless ($connection{'source'} && $connection{'target'}) {
+        $logger->warn("Target and/or source connections are invalid, skipping processing connection");
+        next;
+    }
+
+    # Skipping further processing, if the wiring is a cable connection
+    if (ALX::EN81346::to_string($line_content[2])) {
+        $logger->debug("Cable [" . ALX::EN81346::to_string($line_content[2]) .
+            "] detected, skipping further wire processing");
+        next;
+    }
+
+    # TODO: The handling of mm² and AWG gauge must be implemented
+    if ($connection{'gauge'}) {
+        $connection{'gauge'} =~ s/([0-9,.]+) ?([mawgMAWG]{2,3}).*/$1$2/gi;
+        $logger->debug("Wire gauge [$connection{'gauge'}] detected for the connection");
+    }
+
+    push(@connections, \%connection);
+    #print Dumper \%connection;
     print "$line\n";
+}
+
+#print Dumper \@connections;
+
+# Create a new Excel workbook
+my $excel_file = File::Spec->rel2abs($options{'files'}{'target'}{'file'});
+$logger->info("Creating the excel output [$excel_file]");
+{
+    my $workbook = Excel::Writer::XLSX->new($excel_file) || $logger->logdie("Failed to open the output file");
+    $workbook->set_properties(
+        title    => 'clipx WIRE assist data file',
+        author   => 'Alexander Thiel',
+        comments => 'Created with Kabelsalat wire data crawler',
+    );
+
+    my $worksheet = $workbook->add_worksheet($options{'files'}{'target'}{'table'});
+
+    # There is a weired behaviour in the wire guide software which causes crashes, if
+    # cells have no individual format applied
+    my $header_format = $workbook->add_format(num_format => 0x31);
+    for (my $row = 0; $row < 8; $row++) {
+        for (my $col = 0; $col < 34; $col++) {
+            $worksheet->write_blank($row, $col, $header_format);
+        }
+    }
+    my $special16_format = $workbook->add_format(font => 'Microsoft Sans Serif', size => 16, num_format => 0x31);
+    my $special22_format = $workbook->add_format(font => 'Microsoft Sans Serif', size => 22, num_format => 0x31);
+    $worksheet->write_blank('B6', $special22_format);
+    $worksheet->write_blank('I2', $special16_format);
+    $worksheet->write_blank('I3', $special16_format);
+
+    # The text format for the data cells
+    my $text_format = $workbook->add_format(num_format => 0x31);
+
+    # Writing some dummy data to test the import into the wire assist software
+    # HINT: Strings must be converted to windows codeset
+    for (my $i = 0; $i < scalar(@connections); $i++) {
+        my $row = 7 + $i;
+        my %connection = %{$connections[$i]};
+
+        $worksheet->write_string($row, 0, $i + 1, $text_format);
+        # Source side information
+        $worksheet->write_string($row, 1, decode('utf-8', ALX::EN81346::to_string($connection{'source'}, '==')), $text_format); # Funktionale Zuordnung
+        $worksheet->write_string($row, 2, decode('utf-8', ALX::EN81346::to_string($connection{'source'}, '=')), $text_format);  # Anlage
+        $worksheet->write_string($row, 3, decode('utf-8', ALX::EN81346::to_string($connection{'source'}, '++')), $text_format); # Aufstellungsort
+        $worksheet->write_string($row, 4, decode('utf-8', ALX::EN81346::to_string($connection{'source'}, '+')), $text_format);  # Einbauort
+        $worksheet->write_string($row, 5, decode('utf-8', ALX::EN81346::to_string($connection{'source'}, '-')), $text_format);  # BMK
+        $worksheet->write_string($row, 6, decode('utf-8', ALX::EN81346::to_string($connection{'source'}, ':')), $text_format);  # Anschluss
+        $worksheet->write_blank($row, 7, $text_format);                                                                         # Seite
+        $worksheet->write_string($row, 8, decode('utf-8', 'Aderendhülse_10mm_teilisoliert'), $text_format);                     # Verbindungsende-Behandlung
+        $worksheet->write_blank($row, 9, $text_format);                                                                         # Doppelhülse bei Doppelbelegung
+        $worksheet->write_string($row, 10, decode('utf-8', 'Nach oben, nach links'), $text_format);                             # Verlegerichtung
+        # Target side information
+        $worksheet->write_string($row, 11, decode('utf-8', ALX::EN81346::to_string($connection{'target'}, '==')), $text_format); # Funktionale Zuordnung
+        $worksheet->write_string($row, 12, decode('utf-8', ALX::EN81346::to_string($connection{'target'}, '=')), $text_format);  # Anlage
+        $worksheet->write_string($row, 13, decode('utf-8', ALX::EN81346::to_string($connection{'target'}, '++')), $text_format); # Aufstellungsort
+        $worksheet->write_string($row, 14, decode('utf-8', ALX::EN81346::to_string($connection{'target'}, '+')), $text_format);  # Einbauort
+        $worksheet->write_string($row, 15, decode('utf-8', ALX::EN81346::to_string($connection{'target'}, '-')), $text_format);  # BMK
+        $worksheet->write_string($row, 16, decode('utf-8', ALX::EN81346::to_string($connection{'target'}, ':')), $text_format);  # Anschluss
+        $worksheet->write_blank($row, 17, $text_format);                                                                         # Seite
+        $worksheet->write_string($row, 18, decode('utf-8', 'Aderendhülse_6mm_teilisoliert'), $text_format);                      # Verbindungsende-Behandlung
+        $worksheet->write_blank($row, 19, $text_format);                                                                         # Doppelhülse bei Doppelbelegung
+        $worksheet->write_string($row, 20, decode('utf-8', 'Nach oben, nach links'), $text_format);                              # Verlegerichtung
+        # The wire data
+        $worksheet->write_string($row, 21, decode('utf-8', 'BN'), $text_format);     # Farbe
+        $worksheet->write_string($row, 22, decode('utf-8', '1,5'), $text_format);    # Querschnitt
+        $worksheet->write_string($row, 23, decode('utf-8', 'H07V-K'), $text_format); # Typenbezeichung (Optional)
+        $worksheet->write_blank($row, 24, $text_format);                             # Artikelnummer
+        $worksheet->write_string($row, 25, decode('utf-8', '0,001m'), $text_format); # Länge
+        $worksheet->write_blank($row, 26, $text_format);                             # Bündel
+        $worksheet->write_blank($row, 27, $text_format);                             # Bündelgruppe
+        $worksheet->write_blank($row, 28, $text_format);                             # Funktionsdefinition
+        $worksheet->write_blank($row, 29, $text_format);                             # Paarindex
+        $worksheet->write_blank($row, 30, $text_format);                             # Potential
+        $worksheet->write_blank($row, 31, $text_format);                             # Verbindungsbezeichnung
+        # Software internals for wire assist
+        $worksheet->write_string($row, 32, decode('utf-8', 'Diese Werte wurden mit dem Kabelsalat-Crawler generiert'), $text_format); # Hinweis
+        $worksheet->write_boolean($row, 33, 0, $text_format);                                                                         # Abgearbeitet
+    }
+    $workbook->close();
 }
 
 =pod
@@ -230,4 +347,8 @@ __DATA__
 <files>
     wiring = "./data/wiring.txt"
     devices = "./data/devices.txt"
+    <target>
+        file = "./data/wire_assist_generated.xlsx"
+        table = "ECAD export"
+    </target>
 </files>
