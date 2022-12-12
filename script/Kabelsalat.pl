@@ -198,15 +198,30 @@ my @wiring_file_content = File::Slurp::read_file($options{'files'}{'wiring'}, { 
 foreach my $line (@wiring_file_content) {
     # Splitting the content of the csv data
     my @line_content = split(/[;]/, $line);
+
     # TODO: Implement configurable defaults
     my %connection = (
         'source'          => ALX::EN81346::to_string($line_content[0]),
         'target'          => ALX::EN81346::to_string($line_content[1]),
-        'color'           => $line_content[3] ? $line_content[3] : 'BU',
-        'gauge'           => $line_content[4] ? $line_content[4] : '1mm',
-        'length'          => $line_content[5] ? $line_content[5] : '0,666mm',
-        'comment'         => $line_content[6],
+    #    'gauge'           => $line_content[4] ? $line_content[4] : '1mm',
+    #    'length'          => $line_content[5] ? $line_content[5] : '0,001m',
+    #    'comment'         => $line_content[6],
     );
+
+    # Implementing the color mapping, cause the color definition strings from
+    # the E-CAD may differ to the required test in the wire assist.
+    if(defined $line_content[3]) {
+        $logger->debug("Doing color mapping for [$line_content[3]]");
+        $connection{'color'} = $options{'ecad'}{'colors'}{$line_content[3]};
+        unless(defined $connection{'color'}) {
+            $logger->error("Missing color mapping for [$line_content[3]]");
+        }
+        $connection{'color'} = defined($connection{'color'}) ? uc($connection{'color'}) : $options{'ecad'}{'defaults'}{'color'};
+    }
+    else {
+        $logger->debug("Wire color not defined, using default [$options{'ecad'}{'defaults'}{'color'}]");
+        $connection{'color'} = $options{'ecad'}{'defaults'}{'color'};
+    }
 
     $logger->debug("Inspection connection [$connection{'source'} <-> $connection{'target'}]");
     unless ($connection{'source'} && $connection{'target'}) {
@@ -294,7 +309,7 @@ $logger->info("Creating the excel output [$excel_file]");
         $worksheet->write_blank($row, 19, $text_format);                                                                         # Doppelhülse bei Doppelbelegung
         $worksheet->write_string($row, 20, decode('utf-8', 'Nach oben, nach links'), $text_format);                              # Verlegerichtung
         # The wire data
-        $worksheet->write_string($row, 21, decode('utf-8', 'BN'), $text_format);     # Farbe
+        $worksheet->write_string($row, 21, decode('utf-8', $connection{'color'}), $text_format);     # Farbe
         $worksheet->write_string($row, 22, decode('utf-8', '1,5'), $text_format);    # Querschnitt
         $worksheet->write_string($row, 23, decode('utf-8', 'H07V-K'), $text_format); # Typenbezeichung (Optional)
         $worksheet->write_blank($row, 24, $text_format);                             # Artikelnummer
