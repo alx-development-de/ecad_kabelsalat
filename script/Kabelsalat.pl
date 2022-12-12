@@ -199,29 +199,12 @@ foreach my $line (@wiring_file_content) {
     # Splitting the content of the csv data
     my @line_content = split(/[;]/, $line);
 
-    # TODO: Implement configurable defaults
     my %connection = (
-        'source'          => ALX::EN81346::to_string($line_content[0]),
-        'target'          => ALX::EN81346::to_string($line_content[1]),
-    #    'gauge'           => $line_content[4] ? $line_content[4] : '1mm',
-    #    'length'          => $line_content[5] ? $line_content[5] : '0,001m',
-    #    'comment'         => $line_content[6],
+        'source'  => ALX::EN81346::to_string($line_content[0]),
+        'target'  => ALX::EN81346::to_string($line_content[1]),
+        'comment' => $line_content[6],
+        #    'length'          => $line_content[5] ? $line_content[5] : '0,001m',
     );
-
-    # Implementing the color mapping, cause the color definition strings from
-    # the E-CAD may differ to the required test in the wire assist.
-    if(defined $line_content[3]) {
-        $logger->debug("Doing color mapping for [$line_content[3]]");
-        $connection{'color'} = $options{'ecad'}{'colors'}{$line_content[3]};
-        unless(defined $connection{'color'}) {
-            $logger->error("Missing color mapping for [$line_content[3]]");
-        }
-        $connection{'color'} = defined($connection{'color'}) ? uc($connection{'color'}) : $options{'ecad'}{'defaults'}{'color'};
-    }
-    else {
-        $logger->debug("Wire color not defined, using default [$options{'ecad'}{'defaults'}{'color'}]");
-        $connection{'color'} = $options{'ecad'}{'defaults'}{'color'};
-    }
 
     $logger->debug("Inspection connection [$connection{'source'} <-> $connection{'target'}]");
     unless ($connection{'source'} && $connection{'target'}) {
@@ -236,15 +219,38 @@ foreach my $line (@wiring_file_content) {
         next;
     }
 
-    # TODO: The handling of mm² and AWG gauge must be implemented
-    if ($connection{'gauge'}) {
-        $connection{'gauge'} =~ s/([0-9,.]+) ?([mawgMAWG]{2,3}).*/$1$2/gi;
-        $logger->debug("Wire gauge [$connection{'gauge'}] detected for the connection");
+    # Implementing the color mapping, cause the color definition strings from
+    # the E-CAD may differ to the required test in the wire assist.
+    if (defined $line_content[3]) {
+        $logger->debug("Doing color mapping for [$line_content[3]]");
+        $connection{'color'} = $options{'ecad'}{'colors'}{$line_content[3]};
+        unless (defined $connection{'color'}) {
+            $logger->error("Missing color mapping for [$line_content[3]]");
+        }
+        $connection{'color'} = defined($connection{'color'}) ? uc($connection{'color'}) : $options{'ecad'}{'defaults'}{'color'};
+        $logger->debug("Color [$connection{'color'}] detected for the connection");
+    }
+    else {
+        $logger->debug("Wire color not defined, using default [$options{'ecad'}{'defaults'}{'color'}]");
+        $connection{'color'} = $options{'ecad'}{'defaults'}{'color'};
+    }
+
+    # The wire gauge should be read from the E-CAD export like the wire color and also a default value
+    # from the configuration must be applied if nothing else is specified.
+    if ($line_content[4]) {
+        $logger->debug("Inspecting wire gauge definition [$line_content[4]]");
+        $connection{'wire_gauge'} = $line_content[4];
+        $connection{'wire_gauge'} =~ s/([0-9,.]+).*/$1/gi; # Extracting just the number
+        $logger->debug("Wire gauge [$connection{'wire_gauge'}] detected for the connection");
+    }
+    else {
+        $logger->debug("Wire gauge not defined, using default [$options{'ecad'}{'defaults'}{'wire_gauge'}]mm^2");
+        $connection{'wire_gauge'} = $options{'ecad'}{'defaults'}{'wire_gauge'};
     }
 
     push(@connections, \%connection);
     #print Dumper \%connection;
-    print "$line\n";
+    #print "$line\n";
 }
 
 #print Dumper \@connections;
@@ -294,7 +300,7 @@ $logger->info("Creating the excel output [$excel_file]");
         $worksheet->write_string($row, 5, decode('utf-8', ALX::EN81346::to_string($connection{'source'}, '-')), $text_format);  # BMK
         $worksheet->write_string($row, 6, decode('utf-8', ALX::EN81346::to_string($connection{'source'}, ':')), $text_format);  # Anschluss
         $worksheet->write_blank($row, 7, $text_format);                                                                         # Seite
-        $worksheet->write_string($row, 8, decode('utf-8', 'Aderendhülse_10mm_teilisoliert'), $text_format);                     # Verbindungsende-Behandlung
+        $worksheet->write_string($row, 8, decode('utf-8', 'Teilabzug_10mm'), $text_format);                                     # Verbindungsende-Behandlung
         $worksheet->write_blank($row, 9, $text_format);                                                                         # Doppelhülse bei Doppelbelegung
         $worksheet->write_string($row, 10, decode('utf-8', 'Nach oben, nach links'), $text_format);                             # Verlegerichtung
         # Target side information
@@ -309,17 +315,17 @@ $logger->info("Creating the excel output [$excel_file]");
         $worksheet->write_blank($row, 19, $text_format);                                                                         # Doppelhülse bei Doppelbelegung
         $worksheet->write_string($row, 20, decode('utf-8', 'Nach oben, nach links'), $text_format);                              # Verlegerichtung
         # The wire data
-        $worksheet->write_string($row, 21, decode('utf-8', $connection{'color'}), $text_format);     # Farbe
-        $worksheet->write_string($row, 22, decode('utf-8', '1,5'), $text_format);    # Querschnitt
-        $worksheet->write_string($row, 23, decode('utf-8', 'H07V-K'), $text_format); # Typenbezeichung (Optional)
-        $worksheet->write_blank($row, 24, $text_format);                             # Artikelnummer
-        $worksheet->write_string($row, 25, decode('utf-8', '0,001m'), $text_format); # Länge
-        $worksheet->write_blank($row, 26, $text_format);                             # Bündel
-        $worksheet->write_blank($row, 27, $text_format);                             # Bündelgruppe
-        $worksheet->write_blank($row, 28, $text_format);                             # Funktionsdefinition
-        $worksheet->write_blank($row, 29, $text_format);                             # Paarindex
-        $worksheet->write_blank($row, 30, $text_format);                             # Potential
-        $worksheet->write_blank($row, 31, $text_format);                             # Verbindungsbezeichnung
+        $worksheet->write_string($row, 21, decode('utf-8', $connection{'color'}), $text_format);      # Farbe
+        $worksheet->write_string($row, 22, decode('utf-8', $connection{'wire_gauge'}), $text_format); # Querschnitt
+        $worksheet->write_string($row, 23, decode('utf-8', 'H07V-K'), $text_format);                  # Typenbezeichung (Optional)
+        $worksheet->write_blank($row, 24, $text_format);                                              # Artikelnummer
+        $worksheet->write_string($row, 25, decode('utf-8', '0,001m'), $text_format);                  # Länge
+        $worksheet->write_blank($row, 26, $text_format);                                              # Bündel
+        $worksheet->write_blank($row, 27, $text_format);                                              # Bündelgruppe
+        $worksheet->write_blank($row, 28, $text_format);                                              # Funktionsdefinition
+        $worksheet->write_blank($row, 29, $text_format);                                              # Paarindex
+        $worksheet->write_blank($row, 30, $text_format);                                              # Potential
+        $worksheet->write_blank($row, 31, $text_format);                                              # Verbindungsbezeichnung
         # Software internals for wire assist
         $worksheet->write_string($row, 32, decode('utf-8', 'Diese Werte wurden mit dem Kabelsalat-Crawler generiert'), $text_format); # Hinweis
         $worksheet->write_boolean($row, 33, 0, $text_format);                                                                         # Abgearbeitet
