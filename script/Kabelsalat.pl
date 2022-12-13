@@ -157,7 +157,12 @@ if (-f $options{'files'}{'devices'}) {$logger->debug("Device input file [$option
 else {$logger->logdie("Device input file [$options{'files'}{'devices'}] not available");}
 if (defined $options{'files'}{'output'}) {$logger->debug("Output file [$options{'files'}{'output'}]");}
 
-$logger->debug("Analyzing device list content");
+$logger->info("Loading device database");
+my $VAR1 = read_file(File::Spec->rel2abs('./data/article-data.pld'));
+my %device_db = %{eval($VAR1)};
+($device_db{'_DATABASE_'}{'name'} eq 'Kabelsalat') || $logger->logdie("Unable to load the device database");
+
+$logger->info("Analyzing device list content");
 my %device_structure = ();
 my @device_file_content = File::Slurp::read_file($options{'files'}{'devices'}, { 'chomp' => 1 });
 foreach my $line (@device_file_content) {
@@ -166,7 +171,7 @@ foreach my $line (@device_file_content) {
 
     # Checking device identifier against the EN81346 specification
     $logger->warn("Device identifier [$device] is not valid according EN81346") unless ALX::EN81346::is_valid($device);
-
+    $device = ALX::EN81346::to_string($device); # Normalize the value
     $logger->debug("Parsed line content: [$line] results in DEVICE: [$device] MASTER: [$master] ARTICLES: [$article_name]");
     $device_structure{$device}{'MASTER'} = $master if (defined $master);
 
@@ -187,9 +192,46 @@ foreach my $device (keys(%device_structure)) {
 }
 $logger->info(scalar(keys(%bom)), " Different article(s) found in the structure");
 
-# TODO: Remove if not longer required
-# print Dumper \%device_structure; # Printing the device structure
-# print join(', ', keys(%bom)) . "\n"; # Printing all articles identified
+# This function returns the treatment specification for a device tag with connector
+# aspect. If no specified treatment can be recognized, the default is returned.
+sub getTreatment($;) {
+    my $device = shift();
+    my $bmk =  $device;
+    my $connector = ALX::EN81346::to_string($device, ':');
+    my $result = undef;
+
+    # Removing the identifier and for the bmk the connector part
+    $bmk =~ s/:.*$//;
+    $connector =~ s/[:]//;
+
+    # If both, the bmk and connector string can be detected, let's have a look
+    # if we find some treatment specification for this connector
+    if($bmk && $connector) {
+        $logger->debug("Device/connector identifier recognized [$bmk]/[$connector], checking device structure");
+        my @articles = @{$device_structure{$bmk}{'ARTICLES'}} if $device_structure{$bmk}{'ARTICLES'};
+        if(scalar(@articles)) {
+            $logger->debug("Articles found for device: ".join(", ", @articles));
+            foreach my $article (@articles) {
+                if($device_db{$article}{'CONTACTS'}{$connector}) {
+                    $result = $device_db{$article}{'CONTACTS'}{$connector};
+                    $logger->debug("Treatment [$result] specified for [$device]");
+                }
+            }
+        } else {
+            $logger->debug("No article references found, using default treatment");
+        }
+    } else {
+        $logger->debug("No connector and/or device information recognized in [$device]");
+    }
+
+    # If result has not been specified until this point, the default treatment is used.
+    unless (defined $result) {
+        $logger->debug("No treatment specification found for [$device], using default treatment");
+        $result = $options{'ecad'}{'defaults'}{'treatment'};
+    }
+
+    return $result;
+}
 
 # Parsing the wiring information list
 my @connections = ();
@@ -248,6 +290,10 @@ foreach my $line (@wiring_file_content) {
         $connection{'wire_gauge'} = $options{'ecad'}{'defaults'}{'wire_gauge'};
     }
 
+    # Checking the treatment requirements
+    $connection{'source_treatment'} = getTreatment($connection{'source'});
+    $connection{'target_treatment'} = getTreatment($connection{'target'});
+
     push(@connections, \%connection);
     #print Dumper \%connection;
     #print "$line\n";
@@ -300,7 +346,7 @@ $logger->info("Creating the excel output [$excel_file]");
         $worksheet->write_string($row, 5, decode('utf-8', ALX::EN81346::to_string($connection{'source'}, '-')), $text_format);  # BMK
         $worksheet->write_string($row, 6, decode('utf-8', ALX::EN81346::to_string($connection{'source'}, ':')), $text_format);  # Anschluss
         $worksheet->write_blank($row, 7, $text_format);                                                                         # Seite
-        $worksheet->write_string($row, 8, decode('utf-8', 'Teilabzug_10mm'), $text_format);                                     # Verbindungsende-Behandlung
+        $worksheet->write_string($row, 8, decode('utf-8', $connection{'source_treatment'}), $text_format);                                     # Verbindungsende-Behandlung
         $worksheet->write_blank($row, 9, $text_format);                                                                         # Doppelhülse bei Doppelbelegung
         $worksheet->write_string($row, 10, decode('utf-8', 'Nach oben, nach links'), $text_format);                             # Verlegerichtung
         # Target side information
@@ -311,7 +357,7 @@ $logger->info("Creating the excel output [$excel_file]");
         $worksheet->write_string($row, 15, decode('utf-8', ALX::EN81346::to_string($connection{'target'}, '-')), $text_format);  # BMK
         $worksheet->write_string($row, 16, decode('utf-8', ALX::EN81346::to_string($connection{'target'}, ':')), $text_format);  # Anschluss
         $worksheet->write_blank($row, 17, $text_format);                                                                         # Seite
-        $worksheet->write_string($row, 18, decode('utf-8', 'Aderendhülse_6mm_teilisoliert'), $text_format);                      # Verbindungsende-Behandlung
+        $worksheet->write_string($row, 18, decode('utf-8', $connection{'target_treatment'}), $text_format);                      # Verbindungsende-Behandlung
         $worksheet->write_blank($row, 19, $text_format);                                                                         # Doppelhülse bei Doppelbelegung
         $worksheet->write_string($row, 20, decode('utf-8', 'Nach oben, nach links'), $text_format);                              # Verlegerichtung
         # The wire data

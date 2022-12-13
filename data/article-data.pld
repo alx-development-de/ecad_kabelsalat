@@ -1,20 +1,107 @@
+# Possible values:
+# ================
+# Aderendhülse_6mm_teilisoliert
+# Aderendhülse_8mm_teilisoliert
+# Aderendhülse_10mm_teilisoliert
+# Aderendhülse_12mm_teilisoliert
+# Aderendhülse_18mm_teilisoliert
+# Aderendhülse_22mm_teilisoliert
+# Aderendhülse_25mm_teilisoliert
+# Aderendhülse_27mm_teilisoliert
+# Aderendhülse_5mm_unisoliert
+# Aderendhülse_6mm_unisoliert
+# Aderendhülse_7mm_unisoliert
+# Aderendhülse_8mm_unisoliert
+# Aderendhülse_10mm_unisoliert
+# Aderendhülse_12mm_unisoliert
+# Aderendhülse_15mm_unisoliert
+# Aderendhülse_18mm_unisoliert
+# Aderendhülse_20mm_unisoliert
+# Aderendhülse_40mm_unisoliert
+# Kabelschuh_Ringform_M3_teilisoliert
+# Kabelschuh_Ringform_M3,5_teilisoliert
+# Kabelschuh_Ringform_M4_teilisoliert
+# Kabelschuh_Ringform_M5_teilisoliert
+# Kabelschuh_Ringform_M6_teilisoliert
+# Kabelschuh_Ringform_M8_teilisoliert
+# Kabelschuh_Ringform_M10_teilisoliert
+# Kabelschuh_Ringform_M2,5_unisoliert
+# Kabelschuh_Ringform_M3_unisoliert
+# Kabelschuh_Ringform_M3,5_unisoliert
+# Kabelschuh_Ringform_M4_unisoliert
+# Kabelschuh_Ringform_M5_unisoliert
+# Kabelschuh_Ringform_M6_unisoliert
+# Kabelschuh_Ringform_M8_unisoliert
+# Kabelschuh_Ringform_M10_unisoliert
+# Kabelschuh_Ringform_M12_unisoliert
+# Kabelschuh_Ringform_M16_unisoliert
+# Kabelschuh_Gabelform_M3_teilisoliert
+# Kabelschuh_Gabelform_M3,5_teilisoliert
+# Kabelschuh_Gabelform_M4_teilisoliert
+# Kabelschuh_Gabelform_M5_teilisoliert
+# Kabelschuh_Gabelform_M6_teilisoliert
+# Kabelschuh_Gabelform_M8_teilisoliert
+# Kabelschuh_Gabelform_M3_unisoliert
+# Kabelschuh_Gabelform_M3,5_unisoliert
+# Kabelschuh_Gabelform_M4_unisoliert
+# Kabelschuh_Gabelform_M5_unisoliert
+# Kabelschuh_Gabelform_M6_unisoliert
+# Kabelschuh_Gabelform_M8_unisoliert
+# Flachsteckhülse_2,8x0,5_teilisoliert
+# Flachsteckhülse_2,8x0,8_teilisoliert
+# Flachsteckhülse_4,8x0,5_teilisoliert
+# Flachsteckhülse_4,8x0,8_teilisoliert
+# Flachsteckhülse_6,3x0,8_teilisoliert
+# Flachstecker_2,8x0,5_teilisoliert
+# Flachstecker_2,8x0,8_teilisoliert
+# Flachstecker_4,8x0,5_teilisoliert
+# Flachstecker_4,8x0,8_teilisoliert
+# Flachstecker_6,3x0,8_teilisoliert
+# Flachsteckhülse_2,8x0,5_unisoliert
+# Flachsteckhülse_2,8x0,8_unisoliert
+# Flachsteckhülse_4,8x0,5_unisoliert
+# Flachsteckhülse_4,8x0,8_unisoliert
+# Flachsteckhülse_6,3x0,8_unisoliert
+# Flachstecker_2,8x0,5_unisoliert
+# Flachstecker_2,8x0,8_unisoliert
+# Flachstecker_4,8x0,5_unisoliert
+# Flachstecker_4,8x0,8_unisoliert
+# Flachstecker_6,3x0,8_unisoliert
+# Teilabzug_6mm
+# Teilabzug_8mm
+# Teilabzug_10mm
+# Teilabzug_12mm
+# Teilabzug_18mm
+# Teilabzug_22mm
+# Teilabzug_25mm
+# Teilabzug_27mm
+#
 $VAR1 = {
+          '_DATABASE_' => {
+            'name' => 'Kabelsalat',
+            'version' => '0.0.1'
+          },
           'SIE.LZX:PT570024' => {
                                'CONTACTS' => {
-                                               'A1' => 'HUELSE',
-                                               'A2' => 'HUELSE',
-                                               '11' => 'OHNE',
-                                               '14' => 'OHNE'
+                                               'A1' => 'Aderendhülse_10mm_unisoliert',
+                                               'A2' => 'Aderendhülse_10mm_unisoliert',
+                                               '11' => 'Teilabzug_18mm',
+                                               '14' => 'Teilabzug_18mm'
                                              }
                              },
           'SIE.3RW4026-1TB04' => {
                                'CONTACTS' => {
-                                               'A1' => 'HUELSE',
-                                               'A2' => 'HUELSE',
-                                               '1L1' => 'OHNE',
-                                               '2T1' => 'OHNE',
-                                               '3L2' => 'OHNE',
-                                               '4T2' => 'OHNE'
+                                               'A1' => 'Aderendhülse_22mm_teilisoliert',
+                                               'A2' => 'Aderendhülse_22mm_teilisoliert',
+                                               '1L1' => 'Kabelschuh_Ringform_M6_unisoliert',
+                                               '2T1' => 'Kabelschuh_Ringform_M6_unisoliert',
+                                               '3L2' => 'Kabelschuh_Ringform_M6_unisoliert',
+                                               '4T2' => 'Kabelschuh_Ringform_M6_unisoliert'
                                              }
-                             }
-        };
+                             },
+          'SIE.5SY6510-7' => {
+                               'CONTACTS' => {
+                                               '1' => 'Flachsteckhülse_4,8x0,5_teilisoliert'
+                               }
+          }
+     };
