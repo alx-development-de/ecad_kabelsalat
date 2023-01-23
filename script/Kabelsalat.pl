@@ -13,7 +13,7 @@ use Log::Log4perl::Logger;
 use Encode qw(decode encode);
 use Excel::Writer::XLSX;
 
-use ALX::EN81346;
+use ECAD::EN81346;
 
 use Getopt::Long;
 use Config::General qw(ParseConfig);
@@ -170,8 +170,8 @@ foreach my $line (@device_file_content) {
     my ($device, $article_name, $master) = split(/[;]/, $line);
 
     # Checking device identifier against the EN81346 specification
-    $logger->warn("Device identifier [$device] is not valid according EN81346") unless ALX::EN81346::is_valid($device);
-    $device = ALX::EN81346::to_string($device); # Normalize the value
+    $logger->warn("Device identifier [$device] is not valid according EN81346") unless ECAD::EN81346::is_valid($device);
+    $device = ECAD::EN81346::to_string($device); # Normalize the value
     $logger->debug("Parsed line content: [$line] results in DEVICE: [$device] MASTER: [$master] ARTICLES: [$article_name]");
     $device_structure{$device}{'MASTER'} = $master if (defined $master);
 
@@ -197,7 +197,7 @@ $logger->info(scalar(keys(%bom)), " Different article(s) found in the structure"
 sub getTreatment($;) {
     my $device = shift();
     my $bmk =  $device;
-    my $connector = ALX::EN81346::to_string($device, ':');
+    my $connector = ECAD::EN81346::to_string($device, ':');
     my $result = undef;
 
     # Removing the identifier and for the bmk the connector part
@@ -242,8 +242,8 @@ foreach my $line (@wiring_file_content) {
     my @line_content = split(/[;]/, $line);
 
     my %connection = (
-        'source'  => ALX::EN81346::to_string($line_content[0]),
-        'target'  => ALX::EN81346::to_string($line_content[1]),
+        'source'  => ECAD::EN81346::to_string($line_content[0]),
+        'target'  => ECAD::EN81346::to_string($line_content[1]),
         'comment' => $line_content[6],
         #    'length'          => $line_content[5] ? $line_content[5] : '0,001m',
     );
@@ -255,8 +255,8 @@ foreach my $line (@wiring_file_content) {
     }
 
     # Skipping further processing, if the wiring is a cable connection
-    if (ALX::EN81346::to_string($line_content[2])) {
-        $logger->debug("Cable [" . ALX::EN81346::to_string($line_content[2]) .
+    if (ECAD::EN81346::to_string($line_content[2])) {
+        $logger->debug("Cable [" . ECAD::EN81346::to_string($line_content[2]) .
             "] detected, skipping further wire processing");
         next;
     }
@@ -339,23 +339,23 @@ $logger->info("Creating the excel output [$excel_file]");
 
         $worksheet->write_string($row, 0, $i + 1, $text_format);
         # Source side information
-        $worksheet->write_string($row, 1, decode('utf-8', ALX::EN81346::to_string($connection{'source'}, '==')), $text_format); # Funktionale Zuordnung
-        $worksheet->write_string($row, 2, decode('utf-8', ALX::EN81346::to_string($connection{'source'}, '=')), $text_format);  # Anlage
-        $worksheet->write_string($row, 3, decode('utf-8', ALX::EN81346::to_string($connection{'source'}, '++')), $text_format); # Aufstellungsort
-        $worksheet->write_string($row, 4, decode('utf-8', ALX::EN81346::to_string($connection{'source'}, '+')), $text_format);  # Einbauort
-        $worksheet->write_string($row, 5, decode('utf-8', ALX::EN81346::to_string($connection{'source'}, '-')), $text_format);  # BMK
-        $worksheet->write_string($row, 6, decode('utf-8', ALX::EN81346::to_string($connection{'source'}, ':')), $text_format);  # Anschluss
+        $worksheet->write_string($row, 1, decode('utf-8', ECAD::EN81346::to_string($connection{'source'}, '==')), $text_format); # Funktionale Zuordnung
+        $worksheet->write_string($row, 2, decode('utf-8', ECAD::EN81346::to_string($connection{'source'}, '=')), $text_format);  # Anlage
+        $worksheet->write_string($row, 3, decode('utf-8', ECAD::EN81346::to_string($connection{'source'}, '++')), $text_format); # Aufstellungsort
+        $worksheet->write_string($row, 4, decode('utf-8', ECAD::EN81346::to_string($connection{'source'}, '+')), $text_format);  # Einbauort
+        $worksheet->write_string($row, 5, decode('utf-8', ECAD::EN81346::to_string($connection{'source'}, '-')), $text_format);  # BMK
+        $worksheet->write_string($row, 6, decode('utf-8', ECAD::EN81346::to_string($connection{'source'}, ':')), $text_format);  # Anschluss
         $worksheet->write_blank($row, 7, $text_format);                                                                         # Seite
         $worksheet->write_string($row, 8, decode('utf-8', $connection{'source_treatment'}), $text_format);                                     # Verbindungsende-Behandlung
         $worksheet->write_blank($row, 9, $text_format);                                                                         # Doppelhülse bei Doppelbelegung
         $worksheet->write_string($row, 10, decode('utf-8', 'Nach oben, nach links'), $text_format);                             # Verlegerichtung
         # Target side information
-        $worksheet->write_string($row, 11, decode('utf-8', ALX::EN81346::to_string($connection{'target'}, '==')), $text_format); # Funktionale Zuordnung
-        $worksheet->write_string($row, 12, decode('utf-8', ALX::EN81346::to_string($connection{'target'}, '=')), $text_format);  # Anlage
-        $worksheet->write_string($row, 13, decode('utf-8', ALX::EN81346::to_string($connection{'target'}, '++')), $text_format); # Aufstellungsort
-        $worksheet->write_string($row, 14, decode('utf-8', ALX::EN81346::to_string($connection{'target'}, '+')), $text_format);  # Einbauort
-        $worksheet->write_string($row, 15, decode('utf-8', ALX::EN81346::to_string($connection{'target'}, '-')), $text_format);  # BMK
-        $worksheet->write_string($row, 16, decode('utf-8', ALX::EN81346::to_string($connection{'target'}, ':')), $text_format);  # Anschluss
+        $worksheet->write_string($row, 11, decode('utf-8', ECAD::EN81346::to_string($connection{'target'}, '==')), $text_format); # Funktionale Zuordnung
+        $worksheet->write_string($row, 12, decode('utf-8', ECAD::EN81346::to_string($connection{'target'}, '=')), $text_format);  # Anlage
+        $worksheet->write_string($row, 13, decode('utf-8', ECAD::EN81346::to_string($connection{'target'}, '++')), $text_format); # Aufstellungsort
+        $worksheet->write_string($row, 14, decode('utf-8', ECAD::EN81346::to_string($connection{'target'}, '+')), $text_format);  # Einbauort
+        $worksheet->write_string($row, 15, decode('utf-8', ECAD::EN81346::to_string($connection{'target'}, '-')), $text_format);  # BMK
+        $worksheet->write_string($row, 16, decode('utf-8', ECAD::EN81346::to_string($connection{'target'}, ':')), $text_format);  # Anschluss
         $worksheet->write_blank($row, 17, $text_format);                                                                         # Seite
         $worksheet->write_string($row, 18, decode('utf-8', $connection{'target_treatment'}), $text_format);                      # Verbindungsende-Behandlung
         $worksheet->write_blank($row, 19, $text_format);                                                                         # Doppelhülse bei Doppelbelegung
