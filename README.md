@@ -1,3 +1,10 @@
+![GitHub code size in bytes](https://img.shields.io/github/languages/code-size/alx-development-de/ecad_kabelsalat)
+![GitHub](https://img.shields.io/github/license/alx-development-de/ecad_kabelsalat)
+![GitHub commit activity](https://img.shields.io/github/commit-activity/y/alx-development-de/ecad_kabelsalat)
+![GitHub last commit](https://img.shields.io/github/last-commit/alx-development-de/ecad_kabelsalat)
+![GitHub issues](https://img.shields.io/github/issues-raw/alx-development-de/ecad_kabelsalat)
+![GitHub closed issues](https://img.shields.io/github/issues-closed-raw/alx-development-de/ecad_kabelsalat)
+
 # E-CAD
 
 Tools for electrical engineering issues. This is a library, which is able
