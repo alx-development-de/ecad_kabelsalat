@@ -196,7 +196,7 @@ $logger->info(scalar(keys(%bom)), " Different article(s) found in the structure"
 # aspect. If no specified treatment can be recognized, the default is returned.
 sub getTreatment($;) {
     my $device = shift();
-    my $bmk =  $device;
+    my $bmk = $device;
     my $connector = ECAD::EN81346::to_string($device, ':');
     my $result = undef;
 
@@ -206,21 +206,23 @@ sub getTreatment($;) {
 
     # If both, the bmk and connector string can be detected, let's have a look
     # if we find some treatment specification for this connector
-    if($bmk && $connector) {
+    if ($bmk && $connector) {
         $logger->debug("Device/connector identifier recognized [$bmk]/[$connector], checking device structure");
         my @articles = @{$device_structure{$bmk}{'ARTICLES'}} if $device_structure{$bmk}{'ARTICLES'};
-        if(scalar(@articles)) {
-            $logger->debug("Articles found for device: ".join(", ", @articles));
+        if (scalar(@articles)) {
+            $logger->debug("Articles found for device: " . join(", ", @articles));
             foreach my $article (@articles) {
-                if($device_db{$article}{'CONTACTS'}{$connector}) {
+                if ($device_db{$article}{'CONTACTS'}{$connector}) {
                     $result = $device_db{$article}{'CONTACTS'}{$connector};
                     $logger->debug("Treatment [$result] specified for [$device]");
                 }
             }
-        } else {
+        }
+        else {
             $logger->debug("No article references found, using default treatment");
         }
-    } else {
+    }
+    else {
         $logger->debug("No connector and/or device information recognized in [$device]");
     }
 
@@ -338,43 +340,77 @@ $logger->info("Creating the excel output [$excel_file]");
         my %connection = %{$connections[$i]};
 
         $worksheet->write_string($row, 0, $i + 1, $text_format);
+        # --------------------------------------
         # Source side information
+        # --------------------------------------
         $worksheet->write_string($row, 1, decode('utf-8', ECAD::EN81346::to_string($connection{'source'}, '==')), $text_format); # Funktionale Zuordnung
         $worksheet->write_string($row, 2, decode('utf-8', ECAD::EN81346::to_string($connection{'source'}, '=')), $text_format);  # Anlage
         $worksheet->write_string($row, 3, decode('utf-8', ECAD::EN81346::to_string($connection{'source'}, '++')), $text_format); # Aufstellungsort
         $worksheet->write_string($row, 4, decode('utf-8', ECAD::EN81346::to_string($connection{'source'}, '+')), $text_format);  # Einbauort
         $worksheet->write_string($row, 5, decode('utf-8', ECAD::EN81346::to_string($connection{'source'}, '-')), $text_format);  # BMK
         $worksheet->write_string($row, 6, decode('utf-8', ECAD::EN81346::to_string($connection{'source'}, ':')), $text_format);  # Anschluss
-        $worksheet->write_blank($row, 7, $text_format);                                                                         # Seite
-        $worksheet->write_string($row, 8, decode('utf-8', $connection{'source_treatment'}), $text_format);                                     # Verbindungsende-Behandlung
-        $worksheet->write_blank($row, 9, $text_format);                                                                         # Doppelhülse bei Doppelbelegung
-        $worksheet->write_string($row, 10, decode('utf-8', 'Nach oben, nach links'), $text_format);                             # Verlegerichtung
+        $worksheet->write_blank($row, 7, $text_format);                                                                          # Seite
+        $worksheet->write_string($row, 8, decode('utf-8', $connection{'source_treatment'}), $text_format);                       # Verbindungsende-Behandlung
+        # Anschlussmaß / Connection dimension [1]
+        # Anschlussmaß / Connection dimension [2]
+        # Abisolierlänge / Stripping length [1]
+        # Abisolierlänge / Stripping length [2]
+        $worksheet->write_blank($row, 13, $text_format);                                             # Doppelhülse bei Doppelbelegung
+        # Min. Anzugsdrehmoment / Min. Tightening torque
+        # Max. Anzugsdrehmoment / Max. Tightening torque
+        # Abtriebsgröße / Tool size
+        $worksheet->write_string($row, 17, decode('utf-8', 'Nach oben, nach links'), $text_format); # Verlegerichtung
+
+        # For unknown reasons there are three empty columns between source and target
+
+        # --------------------------------------
         # Target side information
-        $worksheet->write_string($row, 11, decode('utf-8', ECAD::EN81346::to_string($connection{'target'}, '==')), $text_format); # Funktionale Zuordnung
-        $worksheet->write_string($row, 12, decode('utf-8', ECAD::EN81346::to_string($connection{'target'}, '=')), $text_format);  # Anlage
-        $worksheet->write_string($row, 13, decode('utf-8', ECAD::EN81346::to_string($connection{'target'}, '++')), $text_format); # Aufstellungsort
-        $worksheet->write_string($row, 14, decode('utf-8', ECAD::EN81346::to_string($connection{'target'}, '+')), $text_format);  # Einbauort
-        $worksheet->write_string($row, 15, decode('utf-8', ECAD::EN81346::to_string($connection{'target'}, '-')), $text_format);  # BMK
-        $worksheet->write_string($row, 16, decode('utf-8', ECAD::EN81346::to_string($connection{'target'}, ':')), $text_format);  # Anschluss
-        $worksheet->write_blank($row, 17, $text_format);                                                                         # Seite
-        $worksheet->write_string($row, 18, decode('utf-8', $connection{'target_treatment'}), $text_format);                      # Verbindungsende-Behandlung
-        $worksheet->write_blank($row, 19, $text_format);                                                                         # Doppelhülse bei Doppelbelegung
-        $worksheet->write_string($row, 20, decode('utf-8', 'Nach oben, nach links'), $text_format);                              # Verlegerichtung
+        # --------------------------------------
+        $worksheet->write_string($row, 21, decode('utf-8', ECAD::EN81346::to_string($connection{'target'}, '==')), $text_format); # Funktionale Zuordnung
+        $worksheet->write_string($row, 22, decode('utf-8', ECAD::EN81346::to_string($connection{'target'}, '=')), $text_format);  # Anlage
+        $worksheet->write_string($row, 23, decode('utf-8', ECAD::EN81346::to_string($connection{'target'}, '++')), $text_format); # Aufstellungsort
+        $worksheet->write_string($row, 24, decode('utf-8', ECAD::EN81346::to_string($connection{'target'}, '+')), $text_format);  # Einbauort
+        $worksheet->write_string($row, 25, decode('utf-8', ECAD::EN81346::to_string($connection{'target'}, '-')), $text_format);  # BMK
+        $worksheet->write_string($row, 26, decode('utf-8', ECAD::EN81346::to_string($connection{'target'}, ':')), $text_format);  # Anschluss
+        $worksheet->write_blank($row, 27, $text_format);                                                                          # Seite
+        $worksheet->write_string($row, 28, decode('utf-8', $connection{'target_treatment'}), $text_format);                       # Verbindungsende-Behandlung
+        # Anschlussmaß / Connection dimension [1]
+        # Anschlussmaß / Connection dimension [2]
+        # Abisolierlänge / Stripping length [1]
+        # Abisolierlänge / Stripping length [2]
+        $worksheet->write_blank($row, 33, $text_format);                                                                          # Doppelhülse bei Doppelbelegung
+        # Min. Anzugsdrehmoment / Min. Tightening torque
+        # Max. Anzugsdrehmoment / Max. Tightening torque
+        # Abtriebsgröße / Tool size
+        $worksheet->write_string($row, 37, decode('utf-8', 'Nach oben, nach links'), $text_format);                               # Verlegerichtung
+
+        # There is also a gap of three columns between target data and the wire section
+
+        # --------------------------------------
         # The wire data
-        $worksheet->write_string($row, 21, decode('utf-8', $connection{'color'}), $text_format);      # Farbe
-        $worksheet->write_string($row, 22, decode('utf-8', $connection{'wire_gauge'}), $text_format); # Querschnitt
-        $worksheet->write_string($row, 23, decode('utf-8', 'H07V-K'), $text_format);                  # Typenbezeichung (Optional)
-        $worksheet->write_blank($row, 24, $text_format);                                              # Artikelnummer
-        $worksheet->write_string($row, 25, decode('utf-8', '0,001m'), $text_format);                  # Länge
-        $worksheet->write_blank($row, 26, $text_format);                                              # Bündel
-        $worksheet->write_blank($row, 27, $text_format);                                              # Bündelgruppe
-        $worksheet->write_blank($row, 28, $text_format);                                              # Funktionsdefinition
-        $worksheet->write_blank($row, 29, $text_format);                                              # Paarindex
-        $worksheet->write_blank($row, 30, $text_format);                                              # Potential
-        $worksheet->write_blank($row, 31, $text_format);                                              # Verbindungsbezeichnung
+        # --------------------------------------
+        $worksheet->write_string($row, 41, decode('utf-8', $connection{'color'}), $text_format);      # Farbe
+        $worksheet->write_string($row, 42, decode('utf-8', $connection{'wire_gauge'}), $text_format); # Querschnitt (mm) / Cross section [1]
+        # Querschnitt (AWG) / Cross section [2]
+        # Außendurchmesser / Outer diameter [1]
+        # Außendurchmesser / Outer diameter [2]
+        $worksheet->write_string($row, 46, decode('utf-8', 'H07V-K'), $text_format);                  # Typenbezeichung (Optional)
+        $worksheet->write_blank($row, 47, $text_format);                                              # Artikelnummer
+        $worksheet->write_string($row, 48, decode('utf-8', '0,001m'), $text_format);                  # Länge / Lenght [1]
+        # Länge / Lenght [2]
+        $worksheet->write_blank($row, 50, $text_format);                                              # Bündel
+        $worksheet->write_blank($row, 51, $text_format);                                              # Bündelgruppe
+        $worksheet->write_blank($row, 52, $text_format);                                              # Funktionsdefinition
+        $worksheet->write_blank($row, 53, $text_format);                                              # Paarindex
+        $worksheet->write_blank($row, 54, $text_format);                                              # Potential
+        $worksheet->write_blank($row, 55, $text_format);                                              # Verbindungsbezeichnung
+
+        # The same procedure as between the sections before
+        # --------------------------------------
         # Software internals for wire assist
-        $worksheet->write_string($row, 32, decode('utf-8', 'Diese Werte wurden mit dem Kabelsalat-Crawler generiert'), $text_format); # Hinweis
-        $worksheet->write_boolean($row, 33, 0, $text_format);                                                                         # Abgearbeitet
+        # --------------------------------------
+        $worksheet->write_string($row, 59, decode('utf-8', 'Diese Werte wurden mit dem Kabelsalat-Crawler generiert'), $text_format); # Hinweis
+        $worksheet->write_boolean($row, 60, 0, $text_format);                                                                         # Abgearbeitet
     }
     $workbook->close();
 }
@@ -415,7 +451,7 @@ __DATA__
     wiring = "./data/wiring.txt"
     devices = "./data/devices.txt"
     <target>
-        file = "./data/wire_assist_generated.xlsx"
+        file = "./data/wire_assist_1_2_generated.xlsx"
         table = "ECAD export"
     </target>
 </files>
