@@ -18,6 +18,10 @@ Aufwand der technischen Spezifikation im Konstruktionsbüro verbleiben. Hierdurc
 Arbeitsvorbereitungen und Koordinierungsstellen der Produktion ihr Fachwissen und ihre Arbeitskraft
 wieder entsprechend einbringen.
 
+ > **HINWEIS:** Diese Version ist nicht mehr kompatibel zum Phoenix Contact wire Assist in der Version 1.0.
+ > Zur aktuellen Version 1.2 wurden grundlegende Änderungen des Datenformats gemacht, so daß die Daten nicht zwischen
+ > den beiden Version austauschbar sind.
+
 # Copyright und Lizenz
 
 **Copyright (c) 2022 ALX-Development**
