@@ -14,6 +14,9 @@ use Encode qw(decode encode);
 use Excel::Writer::XLSX;
 
 use ECAD::EN81346;
+use feature qw(switch);
+use ECAD::eplan;
+use ECAD::e3series;
 
 use Getopt::Long;
 use Config::General qw(ParseConfig);
@@ -28,7 +31,7 @@ my $default_config = do {
     <main::DATA>
 };
 # Loading the file based configuration
-my %options = ParseConfig(
+our %options = ParseConfig(
     -ConfigFile            => basename($0, qw(.pl .exe .bin)) . '.cfg',
     -ConfigPath            => [ "./", "./etc", "/etc" ],
     -AutoTrue              => 1,
@@ -42,9 +45,10 @@ GetOptions(
     'help|?'     => \($options{'run'}{'help'}),
     'man'        => \($options{'run'}{'man'}),
     'loglevel=s' => \($options{'log'}{'level'}),
-    'wiring=s'   => \($options{'files'}{'wiring'} = './data/wiring-export.txt'),   # Exported wiring list
-    'devices=s'  => \($options{'files'}{'devices'} = './data/devices-export.txt'), # Exported device list
-    'output=s'   => \($options{'files'}{'output'} = undef),                        # If defined, the output is redirected into this file
+    'wiring=s'   => \($options{'files'}{'wiring'}),  # Exported wiring list
+    'devices=s'  => \($options{'files'}{'devices'}), # Exported device list
+    'output=s'   => \($options{'files'}{'output'}),  # If defined, the output is redirected into this file
+    'cadtype=s'  => \($options{'files'}{'cad'})
 ) or die "Invalid options passed to $0\n";
 
 # Show the help message if '--help' or '--?' if provided as command line parameter
@@ -157,40 +161,43 @@ if (-f $options{'files'}{'devices'}) {$logger->debug("Device input file [$option
 else {$logger->logdie("Device input file [$options{'files'}{'devices'}] not available");}
 if (defined $options{'files'}{'output'}) {$logger->debug("Output file [$options{'files'}{'output'}]");}
 
+# The device database is in an own defined format, so there is no need to handle
+# different source formats like the exported data for wiring and bom data.
 $logger->info("Loading device database");
 my $VAR1 = read_file(File::Spec->rel2abs('./data/article-data.pld'));
 my %device_db = %{eval($VAR1)};
 ($device_db{'_DATABASE_'}{'name'} eq 'Kabelsalat') || $logger->logdie("Unable to load the device database");
 
-$logger->info("Analyzing device list content");
-my %device_structure = ();
-my @device_file_content = File::Slurp::read_file($options{'files'}{'devices'}, { 'chomp' => 1 });
-foreach my $line (@device_file_content) {
-    # Splitting the content of the csv data
-    my ($device, $article_name, $master) = split(/[;]/, $line);
+# Checking the ECAD type
+my %device_structure;
+my @connections;
+if( $options{'files'}{'cad'} eq 'eplan') {
 
-    # Checking device identifier against the EN81346 specification
-    $logger->warn("Device identifier [$device] is not valid according EN81346") unless ECAD::EN81346::is_valid($device);
-    $device = ECAD::EN81346::to_string($device); # Normalize the value
-    $logger->debug("Parsed line content: [$line] results in DEVICE: [$device] MASTER: [$master] ARTICLES: [$article_name]");
-    $device_structure{$device}{'MASTER'} = $master if (defined $master);
+    $logger->info("Analyzing device list content");
+    %device_structure = ECAD::eplan::import_devices($options{'files'}{'devices'});
 
-    my @articles = split(/,/, $article_name);
-    if (scalar(@articles)) {
-        $logger->debug("Parsed article structure: [" . join("] [", @articles) . "]");
-        $device_structure{$device}{'ARTICLES'} = \@articles;
-    }
+    # Parsing the wiring information list
+    $logger->info("Parsing the wiring file content from [$options{'files'}{'wiring'}]");
+    # Calling the import and defining the defaults
+    @connections = ECAD::eplan::import_wiring($options{'files'}{'wiring'}, {
+        'color' => 'bl',  #$options{'ecad'}{eplan}{'color'},
+        'gauge' => '1,5', #$options{'ecad'}{eplan}{'wire_gauge'}
+    });
+} elsif ( $options{'files'}{'cad'} eq 'e3series') {
+
+    $logger->info("Analyzing device list content");
+    %device_structure = ECAD::e3series::import_devices($options{'files'}{'devices'});
+
+    # Parsing the wiring information list
+    $logger->info("Parsing the wiring file content from [$options{'files'}{'wiring'}]");
+    # Calling the import and defining the defaults
+    @connections = ECAD::e3series::import_wiring($options{'files'}{'wiring'}, {
+        'color' => 'bl',  #$options{'ecad'}{eplan}{'color'},
+        'gauge' => '1,5', #$options{'ecad'}{eplan}{'wire_gauge'}
+    });
+}else {
+    $logger->logdie("ECAD system type is not specified");
 }
-
-# Building a article list depending on the articles found in the structure
-# TODO: Check if the BOM is really required. Seems to be not needed
-my %bom = ();
-foreach my $device (keys(%device_structure)) {
-    foreach my $article (@{$device_structure{$device}{'ARTICLES'}}) {
-        $bom{$article}++; # increasing the counter for this article
-    }
-}
-$logger->info(scalar(keys(%bom)), " Different article(s) found in the structure");
 
 # This function returns the treatment specification for a device tag with connector
 # aspect. If no specified treatment can be recognized, the default is returned.
@@ -235,73 +242,20 @@ sub getTreatment($;) {
     return $result;
 }
 
-# Parsing the wiring information list
-my @connections = ();
-$logger->info("Parsing the wiring file content from [$options{'files'}{'wiring'}]");
-my @wiring_file_content = File::Slurp::read_file($options{'files'}{'wiring'}, { 'chomp' => 1 });
-foreach my $line (@wiring_file_content) {
-    # Splitting the content of the csv data
-    my @line_content = split(/[;]/, $line);
+# This function is doing the color mapping which is necessary, if the source
+# wire color may be in a different language/standard than the result for the
+# worker assistance system.
+sub colormapping($;) {
+    my $source_color = uc(shift());
 
-    my %connection = (
-        'source'  => ECAD::EN81346::to_string($line_content[0]),
-        'target'  => ECAD::EN81346::to_string($line_content[1]),
-        'comment' => $line_content[6],
-        #    'length'          => $line_content[5] ? $line_content[5] : '0,001m',
-    );
-
-    $logger->debug("Inspection connection [$connection{'source'} <-> $connection{'target'}]");
-    unless ($connection{'source'} && $connection{'target'}) {
-        $logger->warn("Target and/or source connections are invalid, skipping processing connection");
-        next;
+    $logger->debug("Doing color mapping for [$source_color]");
+    my $target_color = $options{'ecad'}{'colors'}{$source_color};
+    unless (defined $target_color) {
+        $logger->error("Missing color mapping for [$source_color]");
     }
-
-    # Skipping further processing, if the wiring is a cable connection
-    if (ECAD::EN81346::to_string($line_content[2])) {
-        $logger->debug("Cable [" . ECAD::EN81346::to_string($line_content[2]) .
-            "] detected, skipping further wire processing");
-        next;
-    }
-
-    # Implementing the color mapping, cause the color definition strings from
-    # the E-CAD may differ to the required test in the wire assist.
-    if (defined $line_content[3]) {
-        $logger->debug("Doing color mapping for [$line_content[3]]");
-        $connection{'color'} = $options{'ecad'}{'colors'}{$line_content[3]};
-        unless (defined $connection{'color'}) {
-            $logger->error("Missing color mapping for [$line_content[3]]");
-        }
-        $connection{'color'} = defined($connection{'color'}) ? uc($connection{'color'}) : $options{'ecad'}{'defaults'}{'color'};
-        $logger->debug("Color [$connection{'color'}] detected for the connection");
-    }
-    else {
-        $logger->debug("Wire color not defined, using default [$options{'ecad'}{'defaults'}{'color'}]");
-        $connection{'color'} = $options{'ecad'}{'defaults'}{'color'};
-    }
-
-    # The wire gauge should be read from the E-CAD export like the wire color and also a default value
-    # from the configuration must be applied if nothing else is specified.
-    if ($line_content[4]) {
-        $logger->debug("Inspecting wire gauge definition [$line_content[4]]");
-        $connection{'wire_gauge'} = $line_content[4];
-        $connection{'wire_gauge'} =~ s/([0-9,.]+).*/$1/gi; # Extracting just the number
-        $logger->debug("Wire gauge [$connection{'wire_gauge'}] detected for the connection");
-    }
-    else {
-        $logger->debug("Wire gauge not defined, using default [$options{'ecad'}{'defaults'}{'wire_gauge'}]mm^2");
-        $connection{'wire_gauge'} = $options{'ecad'}{'defaults'}{'wire_gauge'};
-    }
-
-    # Checking the treatment requirements
-    $connection{'source_treatment'} = getTreatment($connection{'source'});
-    $connection{'target_treatment'} = getTreatment($connection{'target'});
-
-    push(@connections, \%connection);
-    #print Dumper \%connection;
-    #print "$line\n";
+    $target_color = defined($target_color) ? uc($target_color) : $options{'ecad'}{'defaults'}{'color'};
+    return uc($target_color);
 }
-
-#print Dumper \@connections;
 
 # Create a new Excel workbook
 my $excel_file = File::Spec->rel2abs($options{'files'}{'target'}{'file'});
@@ -350,12 +304,12 @@ $logger->info("Creating the excel output [$excel_file]");
         $worksheet->write_string($row, 5, decode('utf-8', ECAD::EN81346::to_string($connection{'source'}, '-')), $text_format);  # BMK
         $worksheet->write_string($row, 6, decode('utf-8', ECAD::EN81346::to_string($connection{'source'}, ':')), $text_format);  # Anschluss
         $worksheet->write_blank($row, 7, $text_format);                                                                          # Seite
-        $worksheet->write_string($row, 8, decode('utf-8', $connection{'source_treatment'}), $text_format);                       # Verbindungsende-Behandlung
+        $worksheet->write_string($row, 8, decode('utf-8', getTreatment($connection{'source'})), $text_format);                   # Verbindungsende-Behandlung
         # Anschlussmaß / Connection dimension [1]
         # Anschlussmaß / Connection dimension [2]
         # Abisolierlänge / Stripping length [1]
         # Abisolierlänge / Stripping length [2]
-        $worksheet->write_blank($row, 13, $text_format);                                             # Doppelhülse bei Doppelbelegung
+        $worksheet->write_blank($row, 13, $text_format); # Doppelhülse bei Doppelbelegung
         # Min. Anzugsdrehmoment / Min. Tightening torque
         # Max. Anzugsdrehmoment / Max. Tightening torque
         # Abtriebsgröße / Tool size
@@ -373,37 +327,37 @@ $logger->info("Creating the excel output [$excel_file]");
         $worksheet->write_string($row, 25, decode('utf-8', ECAD::EN81346::to_string($connection{'target'}, '-')), $text_format);  # BMK
         $worksheet->write_string($row, 26, decode('utf-8', ECAD::EN81346::to_string($connection{'target'}, ':')), $text_format);  # Anschluss
         $worksheet->write_blank($row, 27, $text_format);                                                                          # Seite
-        $worksheet->write_string($row, 28, decode('utf-8', $connection{'target_treatment'}), $text_format);                       # Verbindungsende-Behandlung
+        $worksheet->write_string($row, 28, decode('utf-8', getTreatment($connection{'target'})), $text_format);                   # Verbindungsende-Behandlung
         # Anschlussmaß / Connection dimension [1]
         # Anschlussmaß / Connection dimension [2]
         # Abisolierlänge / Stripping length [1]
         # Abisolierlänge / Stripping length [2]
-        $worksheet->write_blank($row, 33, $text_format);                                                                          # Doppelhülse bei Doppelbelegung
+        $worksheet->write_blank($row, 33, $text_format); # Doppelhülse bei Doppelbelegung
         # Min. Anzugsdrehmoment / Min. Tightening torque
         # Max. Anzugsdrehmoment / Max. Tightening torque
         # Abtriebsgröße / Tool size
-        $worksheet->write_string($row, 37, decode('utf-8', 'Nach oben, nach links'), $text_format);                               # Verlegerichtung
+        $worksheet->write_string($row, 37, decode('utf-8', 'Nach oben, nach links'), $text_format); # Verlegerichtung
 
         # There is also a gap of three columns between target data and the wire section
 
         # --------------------------------------
         # The wire data
         # --------------------------------------
-        $worksheet->write_string($row, 41, decode('utf-8', $connection{'color'}), $text_format);      # Farbe
-        $worksheet->write_string($row, 42, decode('utf-8', $connection{'wire_gauge'}), $text_format); # Querschnitt (mm) / Cross section [1]
+        $worksheet->write_string($row, 41, decode('utf-8', colormapping($connection{'color'})), $text_format); # Farbe
+        $worksheet->write_string($row, 42, decode('utf-8', $connection{'wire_gauge'}), $text_format);          # Querschnitt (mm) / Cross section [1]
         # Querschnitt (AWG) / Cross section [2]
         # Außendurchmesser / Outer diameter [1]
         # Außendurchmesser / Outer diameter [2]
-        $worksheet->write_string($row, 46, decode('utf-8', 'H07V-K'), $text_format);                  # Typenbezeichung (Optional)
-        $worksheet->write_blank($row, 47, $text_format);                                              # Artikelnummer
-        $worksheet->write_string($row, 48, decode('utf-8', '0,001m'), $text_format);                  # Länge / Lenght [1]
+        $worksheet->write_string($row, 46, decode('utf-8', 'H07V-K'), $text_format); # Typenbezeichung (Optional)
+        $worksheet->write_blank($row, 47, $text_format);                             # Artikelnummer
+        $worksheet->write_string($row, 48, decode('utf-8', '0,001m'), $text_format); # Länge / Lenght [1]
         # Länge / Lenght [2]
-        $worksheet->write_blank($row, 50, $text_format);                                              # Bündel
-        $worksheet->write_blank($row, 51, $text_format);                                              # Bündelgruppe
-        $worksheet->write_blank($row, 52, $text_format);                                              # Funktionsdefinition
-        $worksheet->write_blank($row, 53, $text_format);                                              # Paarindex
-        $worksheet->write_blank($row, 54, $text_format);                                              # Potential
-        $worksheet->write_blank($row, 55, $text_format);                                              # Verbindungsbezeichnung
+        $worksheet->write_blank($row, 50, $text_format); # Bündel
+        $worksheet->write_blank($row, 51, $text_format); # Bündelgruppe
+        $worksheet->write_blank($row, 52, $text_format); # Funktionsdefinition
+        $worksheet->write_blank($row, 53, $text_format); # Paarindex
+        $worksheet->write_blank($row, 54, $text_format); # Potential
+        $worksheet->write_blank($row, 55, $text_format); # Verbindungsbezeichnung
 
         # The same procedure as between the sections before
         # --------------------------------------
@@ -448,8 +402,8 @@ __DATA__
 </log>
 
 <files>
-    wiring = "./data/wiring.txt"
-    devices = "./data/devices.txt"
+    wiring = "./data/export/wiring.txt"
+    devices = "./data/export/devices.txt"
     <target>
         file = "./data/wire_assist_1_2_generated.xlsx"
         table = "ECAD export"
