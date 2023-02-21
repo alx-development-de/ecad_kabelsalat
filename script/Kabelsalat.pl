@@ -42,9 +42,9 @@ GetOptions(
     'help|?'     => \($options{'run'}{'help'}),
     'man'        => \($options{'run'}{'man'}),
     'loglevel=s' => \($options{'log'}{'level'}),
-    'wiring=s'   => \($options{'files'}{'wiring'} = './data/wiring-export.txt'),   # Exported wiring list
-    'devices=s'  => \($options{'files'}{'devices'} = './data/devices-export.txt'), # Exported device list
-    'output=s'   => \($options{'files'}{'output'} = undef),                        # If defined, the output is redirected into this file
+    'wiring=s'   => \($options{'files'}{'wiring'}),  # Exported wiring list
+    'devices=s'  => \($options{'files'}{'devices'}), # Exported device list
+    'output=s'   => \($options{'files'}{'output'}),  # If defined, the output is redirected into this file
 ) or die "Invalid options passed to $0\n";
 
 # Show the help message if '--help' or '--?' if provided as command line parameter
@@ -355,7 +355,7 @@ $logger->info("Creating the excel output [$excel_file]");
         # Anschlussmaß / Connection dimension [2]
         # Abisolierlänge / Stripping length [1]
         # Abisolierlänge / Stripping length [2]
-        $worksheet->write_blank($row, 13, $text_format);                                             # Doppelhülse bei Doppelbelegung
+        $worksheet->write_blank($row, 13, $text_format); # Doppelhülse bei Doppelbelegung
         # Min. Anzugsdrehmoment / Min. Tightening torque
         # Max. Anzugsdrehmoment / Max. Tightening torque
         # Abtriebsgröße / Tool size
@@ -378,11 +378,11 @@ $logger->info("Creating the excel output [$excel_file]");
         # Anschlussmaß / Connection dimension [2]
         # Abisolierlänge / Stripping length [1]
         # Abisolierlänge / Stripping length [2]
-        $worksheet->write_blank($row, 33, $text_format);                                                                          # Doppelhülse bei Doppelbelegung
+        $worksheet->write_blank($row, 33, $text_format); # Doppelhülse bei Doppelbelegung
         # Min. Anzugsdrehmoment / Min. Tightening torque
         # Max. Anzugsdrehmoment / Max. Tightening torque
         # Abtriebsgröße / Tool size
-        $worksheet->write_string($row, 37, decode('utf-8', 'Nach oben, nach links'), $text_format);                               # Verlegerichtung
+        $worksheet->write_string($row, 37, decode('utf-8', 'Nach oben, nach links'), $text_format); # Verlegerichtung
 
         # There is also a gap of three columns between target data and the wire section
 
@@ -394,16 +394,16 @@ $logger->info("Creating the excel output [$excel_file]");
         # Querschnitt (AWG) / Cross section [2]
         # Außendurchmesser / Outer diameter [1]
         # Außendurchmesser / Outer diameter [2]
-        $worksheet->write_string($row, 46, decode('utf-8', 'H07V-K'), $text_format);                  # Typenbezeichung (Optional)
-        $worksheet->write_blank($row, 47, $text_format);                                              # Artikelnummer
-        $worksheet->write_string($row, 48, decode('utf-8', '0,001m'), $text_format);                  # Länge / Lenght [1]
+        $worksheet->write_string($row, 46, decode('utf-8', 'H07V-K'), $text_format); # Typenbezeichung (Optional)
+        $worksheet->write_blank($row, 47, $text_format);                             # Artikelnummer
+        $worksheet->write_string($row, 48, decode('utf-8', '0,001m'), $text_format); # Länge / Lenght [1]
         # Länge / Lenght [2]
-        $worksheet->write_blank($row, 50, $text_format);                                              # Bündel
-        $worksheet->write_blank($row, 51, $text_format);                                              # Bündelgruppe
-        $worksheet->write_blank($row, 52, $text_format);                                              # Funktionsdefinition
-        $worksheet->write_blank($row, 53, $text_format);                                              # Paarindex
-        $worksheet->write_blank($row, 54, $text_format);                                              # Potential
-        $worksheet->write_blank($row, 55, $text_format);                                              # Verbindungsbezeichnung
+        $worksheet->write_blank($row, 50, $text_format); # Bündel
+        $worksheet->write_blank($row, 51, $text_format); # Bündelgruppe
+        $worksheet->write_blank($row, 52, $text_format); # Funktionsdefinition
+        $worksheet->write_blank($row, 53, $text_format); # Paarindex
+        $worksheet->write_blank($row, 54, $text_format); # Potential
+        $worksheet->write_blank($row, 55, $text_format); # Verbindungsbezeichnung
 
         # The same procedure as between the sections before
         # --------------------------------------
@@ -448,8 +448,8 @@ __DATA__
 </log>
 
 <files>
-    wiring = "./data/wiring.txt"
-    devices = "./data/devices.txt"
+    wiring = "./data/export/wiring.txt"
+    devices = "./data/export/devices.txt"
     <target>
         file = "./data/wire_assist_1_2_generated.xlsx"
         table = "ECAD export"
