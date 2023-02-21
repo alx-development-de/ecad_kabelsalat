@@ -29,7 +29,7 @@ my $default_config = do {
     <main::DATA>
 };
 # Loading the file based configuration
-my %options = ParseConfig(
+our %options = ParseConfig(
     -ConfigFile            => basename($0, qw(.pl .exe .bin)) . '.cfg',
     -ConfigPath            => [ "./", "./etc", "/etc" ],
     -AutoTrue              => 1,
@@ -211,73 +211,28 @@ sub getTreatment($;) {
     return $result;
 }
 
-# Parsing the wiring information list
-my @connections = ();
-$logger->info("Parsing the wiring file content from [$options{'files'}{'wiring'}]");
-my @wiring_file_content = File::Slurp::read_file($options{'files'}{'wiring'}, { 'chomp' => 1 });
-foreach my $line (@wiring_file_content) {
-    # Splitting the content of the csv data
-    my @line_content = split(/[;]/, $line);
+# This function is doing the color mapping which is necessary, if the source
+# wire color may be in a different language/standard than the result for the
+# worker assistance system.
+sub colormapping($;) {
+    my $source_color = uc(shift());
 
-    my %connection = (
-        'source'  => ECAD::EN81346::to_string($line_content[0]),
-        'target'  => ECAD::EN81346::to_string($line_content[1]),
-        'comment' => $line_content[6],
-        #    'length'          => $line_content[5] ? $line_content[5] : '0,001m',
-    );
-
-    $logger->debug("Inspection connection [$connection{'source'} <-> $connection{'target'}]");
-    unless ($connection{'source'} && $connection{'target'}) {
-        $logger->warn("Target and/or source connections are invalid, skipping processing connection");
-        next;
+    $logger->debug("Doing color mapping for [$source_color]");
+    my $target_color = $options{'ecad'}{'colors'}{$source_color};
+    unless (defined $target_color) {
+        $logger->error("Missing color mapping for [$source_color]");
     }
-
-    # Skipping further processing, if the wiring is a cable connection
-    if (ECAD::EN81346::to_string($line_content[2])) {
-        $logger->debug("Cable [" . ECAD::EN81346::to_string($line_content[2]) .
-            "] detected, skipping further wire processing");
-        next;
-    }
-
-    # Implementing the color mapping, cause the color definition strings from
-    # the E-CAD may differ to the required test in the wire assist.
-    if (defined $line_content[3]) {
-        $logger->debug("Doing color mapping for [$line_content[3]]");
-        $connection{'color'} = $options{'ecad'}{'colors'}{$line_content[3]};
-        unless (defined $connection{'color'}) {
-            $logger->error("Missing color mapping for [$line_content[3]]");
-        }
-        $connection{'color'} = defined($connection{'color'}) ? uc($connection{'color'}) : $options{'ecad'}{'defaults'}{'color'};
-        $logger->debug("Color [$connection{'color'}] detected for the connection");
-    }
-    else {
-        $logger->debug("Wire color not defined, using default [$options{'ecad'}{'defaults'}{'color'}]");
-        $connection{'color'} = $options{'ecad'}{'defaults'}{'color'};
-    }
-
-    # The wire gauge should be read from the E-CAD export like the wire color and also a default value
-    # from the configuration must be applied if nothing else is specified.
-    if ($line_content[4]) {
-        $logger->debug("Inspecting wire gauge definition [$line_content[4]]");
-        $connection{'wire_gauge'} = $line_content[4];
-        $connection{'wire_gauge'} =~ s/([0-9,.]+).*/$1/gi; # Extracting just the number
-        $logger->debug("Wire gauge [$connection{'wire_gauge'}] detected for the connection");
-    }
-    else {
-        $logger->debug("Wire gauge not defined, using default [$options{'ecad'}{'defaults'}{'wire_gauge'}]mm^2");
-        $connection{'wire_gauge'} = $options{'ecad'}{'defaults'}{'wire_gauge'};
-    }
-
-    # Checking the treatment requirements
-    $connection{'source_treatment'} = getTreatment($connection{'source'});
-    $connection{'target_treatment'} = getTreatment($connection{'target'});
-
-    push(@connections, \%connection);
-    #print Dumper \%connection;
-    #print "$line\n";
+    $target_color = defined($target_color) ? uc($target_color) : $options{'ecad'}{'defaults'}{'color'};
+    return uc($target_color);
 }
 
-#print Dumper \@connections;
+# Parsing the wiring information list
+$logger->info("Parsing the wiring file content from [$options{'files'}{'wiring'}]");
+# Calling the import and defining the defaults
+my @connections = ECAD::eplan::import_wiring($options{'files'}{'wiring'}, {
+    'color' => 'bl',  #$options{'ecad'}{eplan}{'color'},
+    'gauge' => '1,5', #$options{'ecad'}{eplan}{'wire_gauge'}
+});
 
 # Create a new Excel workbook
 my $excel_file = File::Spec->rel2abs($options{'files'}{'target'}{'file'});
@@ -326,7 +281,7 @@ $logger->info("Creating the excel output [$excel_file]");
         $worksheet->write_string($row, 5, decode('utf-8', ECAD::EN81346::to_string($connection{'source'}, '-')), $text_format);  # BMK
         $worksheet->write_string($row, 6, decode('utf-8', ECAD::EN81346::to_string($connection{'source'}, ':')), $text_format);  # Anschluss
         $worksheet->write_blank($row, 7, $text_format);                                                                          # Seite
-        $worksheet->write_string($row, 8, decode('utf-8', $connection{'source_treatment'}), $text_format);                       # Verbindungsende-Behandlung
+        $worksheet->write_string($row, 8, decode('utf-8', getTreatment($connection{'source'})), $text_format);                   # Verbindungsende-Behandlung
         # Anschlussmaß / Connection dimension [1]
         # Anschlussmaß / Connection dimension [2]
         # Abisolierlänge / Stripping length [1]
@@ -349,7 +304,7 @@ $logger->info("Creating the excel output [$excel_file]");
         $worksheet->write_string($row, 25, decode('utf-8', ECAD::EN81346::to_string($connection{'target'}, '-')), $text_format);  # BMK
         $worksheet->write_string($row, 26, decode('utf-8', ECAD::EN81346::to_string($connection{'target'}, ':')), $text_format);  # Anschluss
         $worksheet->write_blank($row, 27, $text_format);                                                                          # Seite
-        $worksheet->write_string($row, 28, decode('utf-8', $connection{'target_treatment'}), $text_format);                       # Verbindungsende-Behandlung
+        $worksheet->write_string($row, 28, decode('utf-8', getTreatment($connection{'target'})), $text_format);                   # Verbindungsende-Behandlung
         # Anschlussmaß / Connection dimension [1]
         # Anschlussmaß / Connection dimension [2]
         # Abisolierlänge / Stripping length [1]
@@ -365,8 +320,8 @@ $logger->info("Creating the excel output [$excel_file]");
         # --------------------------------------
         # The wire data
         # --------------------------------------
-        $worksheet->write_string($row, 41, decode('utf-8', $connection{'color'}), $text_format);      # Farbe
-        $worksheet->write_string($row, 42, decode('utf-8', $connection{'wire_gauge'}), $text_format); # Querschnitt (mm) / Cross section [1]
+        $worksheet->write_string($row, 41, decode('utf-8', colormapping($connection{'color'})), $text_format); # Farbe
+        $worksheet->write_string($row, 42, decode('utf-8', $connection{'wire_gauge'}), $text_format);          # Querschnitt (mm) / Cross section [1]
         # Querschnitt (AWG) / Cross section [2]
         # Außendurchmesser / Outer diameter [1]
         # Außendurchmesser / Outer diameter [2]
