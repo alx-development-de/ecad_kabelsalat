@@ -168,16 +168,6 @@ my %device_db = %{eval($VAR1)};
 $logger->info("Analyzing device list content");
 my %device_structure = ECAD::eplan::import_devices($options{'files'}{'devices'});
 
-# Building a article list depending on the articles found in the structure
-# TODO: Check if the BOM is really required. Seems to be not needed
-my %bom = ();
-foreach my $device (keys(%device_structure)) {
-    foreach my $article (@{$device_structure{$device}{'ARTICLES'}}) {
-        $bom{$article}++; # increasing the counter for this article
-    }
-}
-$logger->info(scalar(keys(%bom)), " Different article(s) found in the structure");
-
 # This function returns the treatment specification for a device tag with connector
 # aspect. If no specified treatment can be recognized, the default is returned.
 sub getTreatment($;) {
