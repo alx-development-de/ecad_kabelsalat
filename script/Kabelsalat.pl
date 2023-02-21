@@ -13,6 +13,7 @@ use Log::Log4perl::Logger;
 use Encode qw(decode encode);
 use Excel::Writer::XLSX;
 
+use ECAD::eplan;
 use ECAD::EN81346;
 
 use Getopt::Long;
@@ -157,30 +158,15 @@ if (-f $options{'files'}{'devices'}) {$logger->debug("Device input file [$option
 else {$logger->logdie("Device input file [$options{'files'}{'devices'}] not available");}
 if (defined $options{'files'}{'output'}) {$logger->debug("Output file [$options{'files'}{'output'}]");}
 
+# The device database is in an own defined format, so there is no need to handle
+# different source formats like the exported data for wiring and bom data.
 $logger->info("Loading device database");
 my $VAR1 = read_file(File::Spec->rel2abs('./data/article-data.pld'));
 my %device_db = %{eval($VAR1)};
 ($device_db{'_DATABASE_'}{'name'} eq 'Kabelsalat') || $logger->logdie("Unable to load the device database");
 
 $logger->info("Analyzing device list content");
-my %device_structure = ();
-my @device_file_content = File::Slurp::read_file($options{'files'}{'devices'}, { 'chomp' => 1 });
-foreach my $line (@device_file_content) {
-    # Splitting the content of the csv data
-    my ($device, $article_name, $master) = split(/[;]/, $line);
-
-    # Checking device identifier against the EN81346 specification
-    $logger->warn("Device identifier [$device] is not valid according EN81346") unless ECAD::EN81346::is_valid($device);
-    $device = ECAD::EN81346::to_string($device); # Normalize the value
-    $logger->debug("Parsed line content: [$line] results in DEVICE: [$device] MASTER: [$master] ARTICLES: [$article_name]");
-    $device_structure{$device}{'MASTER'} = $master if (defined $master);
-
-    my @articles = split(/,/, $article_name);
-    if (scalar(@articles)) {
-        $logger->debug("Parsed article structure: [" . join("] [", @articles) . "]");
-        $device_structure{$device}{'ARTICLES'} = \@articles;
-    }
-}
+my %device_structure = ECAD::eplan::import_devices($options{'files'}{'devices'});
 
 # Building a article list depending on the articles found in the structure
 # TODO: Check if the BOM is really required. Seems to be not needed
