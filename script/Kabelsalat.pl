@@ -13,8 +13,10 @@ use Log::Log4perl::Logger;
 use Encode qw(decode encode);
 use Excel::Writer::XLSX;
 
-use ECAD::eplan;
 use ECAD::EN81346;
+use feature qw(switch);
+use ECAD::eplan;
+use ECAD::e3series;
 
 use Getopt::Long;
 use Config::General qw(ParseConfig);
@@ -46,6 +48,7 @@ GetOptions(
     'wiring=s'   => \($options{'files'}{'wiring'}),  # Exported wiring list
     'devices=s'  => \($options{'files'}{'devices'}), # Exported device list
     'output=s'   => \($options{'files'}{'output'}),  # If defined, the output is redirected into this file
+    'cadtype=s'  => \($options{'files'}{'cad'})
 ) or die "Invalid options passed to $0\n";
 
 # Show the help message if '--help' or '--?' if provided as command line parameter
@@ -165,8 +168,36 @@ my $VAR1 = read_file(File::Spec->rel2abs('./data/article-data.pld'));
 my %device_db = %{eval($VAR1)};
 ($device_db{'_DATABASE_'}{'name'} eq 'Kabelsalat') || $logger->logdie("Unable to load the device database");
 
-$logger->info("Analyzing device list content");
-my %device_structure = ECAD::eplan::import_devices($options{'files'}{'devices'});
+# Checking the ECAD type
+my %device_structure;
+my @connections;
+if( $options{'files'}{'cad'} eq 'eplan') {
+
+    $logger->info("Analyzing device list content");
+    %device_structure = ECAD::eplan::import_devices($options{'files'}{'devices'});
+
+    # Parsing the wiring information list
+    $logger->info("Parsing the wiring file content from [$options{'files'}{'wiring'}]");
+    # Calling the import and defining the defaults
+    @connections = ECAD::eplan::import_wiring($options{'files'}{'wiring'}, {
+        'color' => 'bl',  #$options{'ecad'}{eplan}{'color'},
+        'gauge' => '1,5', #$options{'ecad'}{eplan}{'wire_gauge'}
+    });
+} elsif ( $options{'files'}{'cad'} eq 'e3series') {
+
+    $logger->info("Analyzing device list content");
+    %device_structure = ECAD::e3series::import_devices($options{'files'}{'devices'});
+
+    # Parsing the wiring information list
+    $logger->info("Parsing the wiring file content from [$options{'files'}{'wiring'}]");
+    # Calling the import and defining the defaults
+    @connections = ECAD::e3series::import_wiring($options{'files'}{'wiring'}, {
+        'color' => 'bl',  #$options{'ecad'}{eplan}{'color'},
+        'gauge' => '1,5', #$options{'ecad'}{eplan}{'wire_gauge'}
+    });
+}else {
+    $logger->logdie("ECAD system type is not specified");
+}
 
 # This function returns the treatment specification for a device tag with connector
 # aspect. If no specified treatment can be recognized, the default is returned.
@@ -225,14 +256,6 @@ sub colormapping($;) {
     $target_color = defined($target_color) ? uc($target_color) : $options{'ecad'}{'defaults'}{'color'};
     return uc($target_color);
 }
-
-# Parsing the wiring information list
-$logger->info("Parsing the wiring file content from [$options{'files'}{'wiring'}]");
-# Calling the import and defining the defaults
-my @connections = ECAD::eplan::import_wiring($options{'files'}{'wiring'}, {
-    'color' => 'bl',  #$options{'ecad'}{eplan}{'color'},
-    'gauge' => '1,5', #$options{'ecad'}{eplan}{'wire_gauge'}
-});
 
 # Create a new Excel workbook
 my $excel_file = File::Spec->rel2abs($options{'files'}{'target'}{'file'});

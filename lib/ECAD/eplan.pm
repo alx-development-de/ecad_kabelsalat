@@ -5,6 +5,8 @@ use warnings FATAL => 'all';
 use Log::Log4perl;
 use Log::Log4perl::Logger;
 
+use File::Slurp;
+
 use Data::Dumper;
 
 our $VERSION = '0.1';
