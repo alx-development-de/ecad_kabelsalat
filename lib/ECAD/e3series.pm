@@ -181,6 +181,7 @@ sub import_wiring($$;) {
             $connection{'wire_gauge'} = encode('utf-8', substr($line, 122, 10));
             $connection{'wire_gauge'} =~ s/\s*//g;
             $connection{'wire_gauge'} =~ s/[^0-9,.]+//g;
+            $connection{'wire_gauge'} =~ s/[.]+/,/g; # Language depending, must be aproved
         } else {
             $logger->debug("Wire gauge not defined, using default [$default{'gauge'}]mm^2");
             $connection{'wire_gauge'} = $default{'gauge'};
